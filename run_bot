@@ -31,6 +31,72 @@ if ! command -v redis-server >/dev/null 2>&1; then
     exit 1
 fi
 
+if ! command -v yarn >/dev/null 2>&1; then
+    echo "ERROR: missing requirement: yarn"
+    case $OSTYPE in
+        darwin*)
+            if command -v brew >/dev/null 2>&1; then
+                echo "Install with: brew install yarn"
+            elif comman -v port >/dev/null 2>&1; then
+                echo "Install with: sudo port install yarn"
+            else
+                echo "See https://yarnpkg.com for installation details"
+            fi
+            ;;
+        linux*)
+            if command -v apt-get >/dev/null 2>&1; then
+                echo "Install with: sudo apt-get install yarn"
+            elif command -v pacman >/dev/null 2>&1; then
+                echo "Install with: sudo pacman -S yarn"
+            else
+                echo "See https://yarnpkg.com for installation details"
+            fi
+            ;;
+        *)
+            echo "See https://yarnpkg.com for installation details"
+            ;;
+    esac
+    exit 1
+fi
+
+if ! command -v jrunscript >/dev/null 2>&1; then
+    echo "ERROR: missing requirement: java"
+    case $OSTYPE in
+        darwin*)
+            if command -v brew >/dev/null 2>&1; then
+                echo "Install with: brew cask install java"
+            else
+                echo "Google search for the best way to install this for your OS."
+            fi
+            ;;
+        *)
+            echo "Google search for the best way to install this for your OS."
+            ;;
+    esac
+    exit 1
+fi
+
+# check for
+if ! jrunscript -e 'if (javax.crypto.Cipher.getMaxAllowedKeyLength("RC5") >= 256) { exit(0); } else { exit(1); }'; then
+    echo "ERROR: missing requirement: Java Cryptography Extension (JCE) Unlimited Strength Jurisdiction Policy"
+    case $OSTYPE in
+        darwin*)
+            if command -v brew >/dev/null 2>&1; then
+                echo "Install with: brew cask install jce-unlimited-strength-policy"
+            else
+                echo "Google search for the best way to install this for your OS."
+            fi
+            ;;
+        *)
+            echo "Google search for the best way to install this for your OS."
+            ;;
+    esac
+    exit 1
+fi
+
+# install javascript dependencies
+yarn
+
 # check for arguments in command line
 for filename in "$@"; do
     if [[ $filename == *.conf ]]; then
@@ -70,7 +136,7 @@ if [ ! -e $BOT_JS ]; then
     exit 1
 fi
 
-source $CONFIG_FILE
+IFS=$'\n\t' source $CONFIG_FILE
 
 # make sure database url is set
 if [ -z ${DATABASE_URL:-} ]; then
@@ -114,7 +180,7 @@ fi
 
 # default stage set to production
 if [ -z ${STAGE:-} ]; then
-    $STAGE=production
+    STAGE=production
 fi
 
 # pull headless client
@@ -139,8 +205,9 @@ done
 REDIS_URL=redis://localhost:$REDIS_PORT
 
 YMLCONFIG=config/$STAGE.yml
+HEADLESS_JAR=$(ls -t build/libs/token-headless*.jar | head -1)
 
 redis-server --port $REDIS_PORT --loglevel warning && killgroup || killgroup &
-STAGE=$STAGE DATABASE_URL=$DATABASE_URL REDIS_URL=$REDIS_URL TOKEN_APP_SEED=$TOKEN_APP_SEED TOKEN_APP_USERNAME=$TOKEN_APP_USERNAME TOKEN_APP_NAME=${TOKEN_APP_NAME:-} TOKEN_APP_AVATAR=${TOKEN_APP_AVATAR:-} java ${JAVA_OPTS+x} -jar ../token-headless-client/build/libs/token-headless-0.1.2-capsule.jar $YMLCONFIG && killgroup || killgroup &
+STAGE=$STAGE DATABASE_URL=$DATABASE_URL REDIS_URL=$REDIS_URL TOKEN_APP_SEED=$TOKEN_APP_SEED TOKEN_APP_USERNAME=$TOKEN_APP_USERNAME TOKEN_APP_NAME=${TOKEN_APP_NAME:-} TOKEN_APP_AVATAR=${TOKEN_APP_AVATAR:-} java ${JAVA_OPTS+x} -jar $HEADLESS_JAR $YMLCONFIG && killgroup || killgroup &
 STAGE=$STAGE DATABASE_URL=$DATABASE_URL REDIS_URL=$REDIS_URL TOKEN_APP_SEED=$TOKEN_APP_SEED TOKEN_APP_USERNAME=$TOKEN_APP_USERNAME TOKEN_APP_NAME=${TOKEN_APP_NAME:-} ENABLE_LOG_TIMESTAMPS=$ENABLE_LOG_TIMESTAMPS LOG_LEVEL=${LOG_LEVEL:-} node_modules/.bin/nodemon -L $BOT_JS $YMLCONFIG && killgroup || killgroup &
 wait
