@@ -1,92 +1,108 @@
-const SOFA = require('sofa-js');
+const Bot = require('./lib/Bot')
+const SOFA = require('sofa-js')
 const Fiat = require('./lib/Fiat')
-const Bot = require('./lib/Bot');
 
-let bot = new Bot();
+let bot = new Bot()
 
 bot.onEvent = function(session, message) {
   switch (message.type) {
-    case "Message":
-      onMessage(session, message);
-      break;
-    case "Command":
-      onCommand(session, message);
-      break;
-    case "PaymentRequest":
-      onPaymentRequest(session, message);
-      break;
+    case 'Init':
+      welcome(session)
+      break
+    case 'Message':
+      onMessage(session, message)
+      break
+    case 'Command':
+      onCommand(session, message)
+      break
+    case 'Payment':
+      onPayment(session, message)
+      break
+    case 'PaymentRequest':
+      welcome(session)
+      break
   }
 }
-
 
 function onMessage(session, message) {
-  //if message body contains the word beg, request a payment
-  if (message.content.body.includes('beg')) {
-    session.requestEth(3.5, 'I need about tree fiddy')
-    return
-  }
-
-  //if it contains the word ethlogo, send an image message
-  if (message.content.body.includes('ethlogo')) {
-    session.reply(SOFA.Message({
-      body: "Here is your logo",
-      attachments: [{
-        "type": "image",
-        "url": "ethereum.jpg"
-      }]
-    }))
-    return
-  }
-
-  //if it contains a known fiat currency code, send the ETH conversion
-  if (Object.keys(Fiat.rates).indexOf(message.content.body) > -1) {
-    Fiat.fetch().then((toEth) => {
-      session.reply('1 ETH is worth ' + toEth[message.content.body]() + ' ' + message.content.body)
-    })
-    return
-  }
-
-  //otherwise send a default prompt
-  sendColorPrompt(session, "I only want to talk about my favorite color. Guess what it is!");
+  welcome(session)
 }
-
-
-function sendColorPrompt(session, body) {
-  session.reply(SOFA.Message({
-    body:  body,
-    controls: [
-      {type: "button", label: "Red", value: "red"},
-      {type: "button", label: "Green", value: "green"},
-      {type: "button", label: "Blue", value: "blue"}
-    ],
-    showKeyboard: false
-  }));
-}
-
 
 function onCommand(session, command) {
-  if (command.content.value === "red") {
-    session.reply("Yep! Red is the best");
+  switch (command.content.value) {
+    case 'ping':
+      pong(session)
+      break
+    case 'count':
+      count(session)
+      break
+    case 'donate':
+      donate(session)
+      break
+    }
+}
+
+function onPayment(session, message) {
+  if (message.fromAddress == session.config.paymentAddress) {
+    // handle payments sent by the bot
+    if (message.status == 'confirmed') {
+      // perform special action once the payment has been confirmed
+      // on the network
+    } else if (message.status == 'error') {
+      // oops, something went wrong with a payment we tried to send!
+    }
   } else {
-    sendColorPrompt(session, "Nope! Try again.");
+    // handle payments sent to the bot
+    if (message.status == 'unconfirmed') {
+      // payment has been sent to the ethereum network, but is not yet confirmed
+      sendMessage(session, `Thanks for the payment! 🙏`);
+    } else if (message.status == 'confirmed') {
+      // handle when the payment is actually confirmed!
+    } else if (message.status == 'error') {
+      sendMessage(session, `There was an error with your payment!🚫`);
+    }
   }
 }
 
+// STATES
 
-function onPaymentRequest(session, message) {
-  //fetch fiat conversion rates
+function welcome(session) {
+  if (session.user.name) {
+    sendMessage(session, `Hello ` + session.user.name + "!")  
+  } else{
+    sendMessage(session, `Hello Toshi!`)
+  }
+}
+
+function pong(session) {
+  sendMessage(session, `Pong`)
+}
+
+// example of how to store state on each user
+function count(session) {
+  let count = (session.get('count') || 0) + 1
+  session.set('count', count)
+  sendMessage(session, `${count}`)
+}
+
+function donate(session) {
+  // request $1 USD at current exchange rates
   Fiat.fetch().then((toEth) => {
-    let limit = toEth.USD(100)
-    if (message.ethValue < limit) {
-      session.sendEth(message.ethValue, (session, error, result) => {
-        if (error) { session.reply('I tried but there was an error') }
-        if (result) { session.reply('Here you go!') }
-      })
-    } else {
-      session.reply('Sorry, I have a 100 USD limit.')
-    }
+    session.requestEth(toEth.USD(1))
   })
-  .catch((error) => {
-    session.reply('Sorry, something went wrong while I was looking up exchange rates')
-  })
+}
+
+// HELPERS
+
+function sendMessage(session, message) {
+  let controls = [
+    {type: 'button', label: 'Ping', value: 'ping'},
+    {type: 'button', label: 'Count', value: 'count'},
+    {type: 'button', label: 'Donate', value: 'donate'}
+  ]
+  session.reply(SOFA.Message({
+    body: message,
+    controls: controls,
+    showKeyboard: false,
+  }))
 }
