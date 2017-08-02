@@ -69,7 +69,11 @@ function onPayment(session, message) {
 // STATES
 
 function welcome(session) {
-  sendMessage(session, `Hello Token!`)
+  if (session.user.name) {
+    sendMessage(session, `Hello ` + session.user.name + "!")  
+  } else{
+    sendMessage(session, `Hello Toshi!`)
+  }
 }
 
 function pong(session) {
