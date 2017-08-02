@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "Attach to Docker Bot",
+            "address": "localhost",
+            "port": 5859,
+            "localRoot": "${workspaceRoot}",
+            "remoteRoot": "/usr/src/bot",
+            "protocol": "inspector",
+            "restart": true
+        }
+    ]
+}

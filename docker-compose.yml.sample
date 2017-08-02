@@ -22,6 +22,8 @@ services:
     links:
       - redis
       - postgres
+    ports:
+      - "127.0.0.1:5859:5859"
     environment: *environment
     volumes:
       - ./config/docker.yml:/usr/src/bot/config.yml
