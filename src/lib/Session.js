@@ -23,6 +23,8 @@ class Session {
     this.thread = null;
     this.state = null;
 
+    this.globals = {}
+
     this.load(onReady);
   }
 
@@ -176,30 +178,43 @@ class Session {
   }
 
   load(onReady) {
-    this.storage.loadBotSession(this.address).then((data) => {
-      this.data = data;
-      if (this.data._thread) {
-        this.thread = this.bot.threads[this.data._thread];
-      }
-      if (this.data._state) {
-        this.state = this.data._state;
-      }
-      if (this.address != "anonymous") {
-        IdService.getUser(this.address)
-          .then((user) => {
-            this.user = user;
-            onReady();
-          })
-      } else {
-        this.user = {};
-        onReady();
-      }
-    });
+    this.storage.loadBotSession('globals').then((_globals) => {
+      this.globals = _globals || {}
+      // continue
+      this.storage.loadBotSession(this.address).then((data) => {
+        this.data = data;
+        if (this.data._thread) {
+          this.thread = this.bot.threads[this.data._thread];
+        }
+        if (this.data._state) {
+          this.state = this.data._state;
+        }
+        if (this.address != "anonymous") {
+          IdService.getUser(this.address)
+            .then((user) => {
+              this.user = user;
+              onReady();
+            })
+        } else {
+          this.user = {};
+          onReady();
+        }
+      });
+    })
   }
 
   flush() {
     this.data.timestamp = Math.round(new Date().getTime()/1000);
     this.storage.updateBotSession(this.address, this.data);
+  }
+
+  getGlobal(key, missing) {
+    return this.globals[key] || missing
+  }
+
+  setGlobal(key, value) {
+    this.globals[key] = value
+    this.storage.updateBotSession('globals', this.globals)
   }
 
   get json() {
